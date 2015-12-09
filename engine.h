@@ -13,9 +13,9 @@
 #ifndef VECTOR2_TYPE
 #define VECTOR2_TYPE
 
-typedef EH::EHMatrix< float , 2 , 1 > vector2;
+typedef EH::Matrix::Matrix< float , 2 , 1 > vector2;
 template < typename T >
-using vec2 = EH::EHMatrix< T , 2 , 1 >;
+using vec2 = EH::Matrix::Matrix< T , 2 , 1 >;
 //#include "vector2.h"
 
 #endif

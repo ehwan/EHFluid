@@ -8,9 +8,9 @@
 #ifndef VECTOR2_TYPE
 #define VECTOR2_TYPE
 
-typedef EH::EHMatrix< float , 2 , 1 > vector2;
+typedef EH::Matrix::Matrix< float , 2 , 1 > vector2;
 template < typename T >
-using vec2 = EH::EHMatrix< T , 2 , 1 >;
+using vec2 = EH::Matrix::Matrix< T , 2 , 1 >;
 //#include "vector2.h"
 //
 #endif
@@ -230,7 +230,7 @@ using std::fill;
             particle.vorticity[i].Normalize();
             particle.force[i] =
                 gravdt + invmdt * ( particle.force[i]
-                        + EH::Cross( particle.vorticity[i] , particle.angularpressure[i] )
+                        + EH::Matrix::Cross( particle.vorticity[i] , particle.angularpressure[i] )
                         );
         }
         transform( particle.velocity , particle.velocity + particle.count , particle.force , particle.velocity ,
@@ -302,20 +302,20 @@ using std::for_each;
                 std::plus<float>() ,
                 []( const vector2& force , const vector2& rel )->float
                 {
-                    return EH::Cross( rel , force );
+                    return EH::Matrix::Cross( rel , force );
                 }
                 )
             * invI * dt;
         omega += alphadt;
 
         const float dtheta = ( omega + 0.5f*alphadt ) * dt;
-        const vector2 dthetap = EH::Complex::Complex( dtheta );
+        const vector2 dthetap = EH::Matrix::Complex::Complex( dtheta );
 
 
         for_each( particle.relative , particle.relative ,
                 [&dthetap]( vector2& rel )
                 {
-                    rel = EH::Complex::Multiply( rel , dthetap );
+                    rel = EH::Matrix::Complex::Multiply( rel , dthetap );
                     //rel.rotate( dthetap.x , dthetap.y );
                 }
                 );
@@ -332,7 +332,7 @@ using std::for_each;
         transform( particle.relative , particle.relative + particle.count , particle.velocity ,
                 [&vel , omg]( const vector2& rel )->vector2
                 {
-                    return EH::Cross( omg , rel );
+                    return EH::Matrix::Cross( omg , rel );
                 }
                 );
     }

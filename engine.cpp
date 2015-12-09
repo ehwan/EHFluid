@@ -21,13 +21,13 @@ void FluidEngine::Load( const vector2& minbound , const vector2& maxbound , unsi
     aabb.mingrid = aabb.min * GRID_PER_METER;
 
     //const vector2 gsize = (aabb.max - aabb.min) * GRID_PER_METER;
-    const vector2 gsize = EH::fma( aabb.max , GRID_PER_METER , -aabb.mingrid );
+    const vector2 gsize = EH::Matrix::fma( aabb.max , GRID_PER_METER , -aabb.mingrid );
     grid_attrib.Load( (unsigned int)std::ceil( gsize[0] ) , (unsigned int)std::ceil( gsize[1] ) , maxc );
 }
 
 void FluidEngine::AddParticle( const vector2& pos , const vector2& vel , FluidGroup *grp )
 {
-    const vector2 gridf = EH::fma( pos , GRID_PER_METER , -aabb.mingrid );
+    const vector2 gridf = EH::Matrix::fma( pos , GRID_PER_METER , -aabb.mingrid );
     //const vector2 gridf = ( pos - aabb.min )*FluidEngine::GRID_PER_METER;
     const unsigned int gx = (unsigned int)std::floor( gridf[0] );
     const unsigned int gy = (unsigned int)std::floor( gridf[1] );
@@ -65,7 +65,7 @@ using std::partial_sum;
             while( i )
             {
                 --i;
-                const vector2 gridf = EH::fma( grp->particle.position[i] , GRID_PER_METER , -aabb.mingrid );
+                const vector2 gridf = EH::Matrix::fma( grp->particle.position[i] , GRID_PER_METER , -aabb.mingrid );
                 const unsigned int gx = (unsigned int)std::floor(gridf[0]);
                 const unsigned int gy = (unsigned int)std::floor(gridf[1]);
 
@@ -206,12 +206,12 @@ void FluidEngine::AddPair( const particle_index_type& p1 , const particle_index_
         p2.group->particle.surfacenormal[ p2.index ] += pair.relq;
 
         //const float dvr = -dv.dot( rel ) * h;
-        const float dvr = -EH::ATxB( dv , rel ) * h;
+        const float dvr = -EH::Matrix::ATxB( dv , rel ) * h;
         *pair.veldif1 += dvr*m2;
         *pair.veldif2 += dvr*m1;
 
         //const float tempw =  rel.cross( dv ) * h;
-        const float tempw = EH::Cross( rel , dv ) * h;
+        const float tempw = EH::Matrix::Cross( rel , dv ) * h;
         *pair.omega1 += tempw;
         *pair.omega2 += tempw;
     }

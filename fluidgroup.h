@@ -1,19 +1,9 @@
 #pragma once
 
+#include <memory>
 #include <algorithm>
-#include <numeric>
 #include <vector>
-#include "../Matrix/EHMatrix.h"
-
-#ifndef VECTOR2_TYPE
-#define VECTOR2_TYPE
-
-typedef EH::Matrix::Matrix< float , 2 , 1 > vector2;
-template < typename T >
-using vec2 = EH::Matrix::Matrix< T , 2 , 1 >;
-//#include "vector2.h"
-//
-#endif
+#include "fluid_global.h"
 
 struct FluidGroup
 {
@@ -31,75 +21,40 @@ struct FluidGroup
     struct _Container
     {
         unsigned int count;
-        vector2 *position;
-        vector2 *velocity;
-        vector2 *force;
-        vector2 *relative;
-        vector2 *surfacenormal;
-        unsigned int *grid;
-        float *rho;
-        float *pressure;
-        float *veldiffpressure;
-        float *angularpressure;
-        vector2 *vorticity;
-        unsigned int *gridindex;
-
-        _Container()
-        {
-            position = 0;
-            velocity = 0;
-            force = 0;
-            relative = 0;
-            surfacenormal = 0;
-            grid = 0;
-            rho = 0;
-            pressure = 0;
-            veldiffpressure = 0;
-            angularpressure = 0;
-            vorticity = 0;
-            gridindex = 0;
-        }
-        ~_Container()
-        {
-            if( position )  { delete[] position; }
-            if( velocity )  { delete[] velocity; }
-            if( force )     { delete[] force; }
-            if( relative )  { delete[] relative; }
-            if( surfacenormal ) { delete[] surfacenormal; }
-            if( grid )      { delete[] grid; }
-            if( rho )       { delete[] rho; }
-            if( pressure )  { delete[] pressure; }
-            if( veldiffpressure ) { delete[] veldiffpressure; }
-            if( angularpressure ) { delete[] angularpressure; }
-            if( vorticity ) { delete[] vorticity; }
-            if( gridindex ) { delete[] gridindex; }
-        }
+        unsigned int max;
+        std::unique_ptr< vector2[] > position ,
+                                   velocity ,
+                                   force ,
+                                   relative ,
+                                   surfacenormal;
+        std::unique_ptr< float[] >   rho ,
+                                   pressure ,
+                                   veldiffpressure;
+        std::unique_ptr< unsigned int[] > grid ,
+                                        gridindex;
         void Init()
         {
-            using std::fill;
-            fill( rho , rho + count , 0.0f );
-            fill( veldiffpressure , veldiffpressure + count , 0.0f );
-            fill( angularpressure , angularpressure + count , 0.0f );
-            fill( surfacenormal , surfacenormal + count , vector2(0.0f) );
-            fill( vorticity , vorticity + count , vector2(0.0f) );
+            std::fill( rho.get() , rho.get() + count , 0.0f );
+            std::fill( veldiffpressure.get() , veldiffpressure.get() + count , 0.0f );
+            std::fill( surfacenormal.get() , surfacenormal.get() + count , vector2(0.0f) );
             //fill( pressure.begin() , pressure.end() , 0.0f );
         }
         void Load( std::size_t size )
         {
+            using std::make_unique;
+            max = size;
             count = 0;
 
-            position                        = new vector2[ size ];
-            velocity                        = new vector2[ size ];
-            force                           = new vector2[ size ];
-            relative                        = new vector2[ size ];
-            surfacenormal                   = new vector2[ size ];
-            grid                            = new unsigned int[ size ];
-            rho                             = new float[ size ];
-            pressure                        = new float[ size ];
-            veldiffpressure                 = new float[ size ];
-            angularpressure                 = new float[ size ];
-            vorticity                       = new vector2[ size ];
-            gridindex                       = new unsigned int[ size ];
+            position            = make_unique< vector2[] >( size );
+            velocity            = make_unique< vector2[] >( size );
+            force               = make_unique< vector2[] >( size );
+            relative            = make_unique< vector2[] >( size );
+            surfacenormal       = make_unique< vector2[] >( size );
+            grid                = make_unique< unsigned int[] >( size );
+            rho                 = make_unique< float[] >( size );
+            pressure            = make_unique< float[] >( size );
+            veldiffpressure     = make_unique< float[] >( size );
+            gridindex           = make_unique< unsigned int[] >( size );
         }
         void DeleteBack( unsigned int pos )
         {
@@ -112,6 +67,7 @@ struct FluidGroup
         }
         void Add( const vector2& pos , const vector2& vel , unsigned int grd )
         {
+            if( count == max ){ return; }
             position[ count ] = pos;
             velocity[ count ] = vel;
             grid[ count ] = grd;
@@ -146,12 +102,16 @@ struct FluidGroup
             Set( mas );
         }
 
+        operator float () const
+        {
+            return m;
+        }
+
     } mass;
 
     float rest_density;
     float pressurek;
     float veldiffk;
-    float vorticityk;
 
     float viscosity;
 
@@ -169,81 +129,57 @@ struct FluidGroup
         rest_density = 3.0f;
         pressurek = 1.2f;
         veldiffk = 10.0f;
-        vorticityk = 3.0f;
 
         viscosity = 0.3f;
     }
     void CalculatePressure()
     {
-using std::transform;
-        const float veldifk = veldiffk;
-        transform( particle.veldiffpressure , particle.veldiffpressure + particle.count , particle.rho , particle.veldiffpressure ,
-                [ veldifk ]( float dv , float p )->float
-                {
-                    return dv/p * veldifk;
-                }
-                );
-        const float restdens = rest_density;
-        const float pk = pressurek;
-        const float mas = mass.m;
-        transform( particle.rho , particle.rho + particle.count , particle.pressure ,
-                [ mas , restdens , pk ]( float p )->float
-                {
-                    return ( p + mas - restdens ) * pk;
-                }
-                );
-        const float vortk = vorticityk;
-        transform( particle.angularpressure , particle.angularpressure + particle.count , particle.angularpressure ,
-                [ vortk ]( float p )->float
-                {
-                    return p * vortk;
-                }
-                );
+        for( unsigned int i=0; i<particle.count; ++i )
+        {
+            particle.veldiffpressure[i] *= veldiffk/particle.rho[i];
+        }
+        for( unsigned int i=0; i<particle.count; ++i )
+        {
+            particle.pressure[i] = ( particle.rho[i] + mass - rest_density ) * pressurek;
+        }
+        //for( unsigned int i=0; i<particle.count; ++i )
+        //{
+            //particle.angularpressure[i] *= vorticityk/particle.rho[i];
+        //}
     }
 
     void ClampVelocity()
     {
 constexpr static float MAX_VELOCITY_MAG = 10.0f;
-using std::for_each;
-        for_each( particle.velocity , particle.velocity + particle.count ,
-                []( vector2& vel )
-                {
-                    if( vel.LengthSquared() > MAX_VELOCITY_MAG*MAX_VELOCITY_MAG )
-                    {
-                        vel.Normalize();
-                        vel *= MAX_VELOCITY_MAG;
-                    }
-                    ////or non-branching code.
-                    //const float l = std::fmin( vel.Normalize() , MAX_VELOCITY_MAG );
-                    //vel *= l;
-                }
-                );
+        for( unsigned int i=0; i<particle.count; ++i )
+        {
+            vector2& vel = particle.velocity[i];
+            if( vel.LengthSquared() > MAX_VELOCITY_MAG*MAX_VELOCITY_MAG )
+            {
+                vel.Normalize();
+                vel *= MAX_VELOCITY_MAG;
+            }
+        }
     }
     virtual void Advect( float dt )
     {
-using std::transform;
-using std::fill;
         const vector2 gravdt = gravity * (mass.ascale*dt);
         const float invmdt = mass.invm*dt;
-        for( decltype( particle.count ) i=0; i<particle.count; ++i )
+        for( unsigned int i=0; i<particle.count; ++i )
         {
-            particle.vorticity[i].Normalize();
             particle.force[i] =
-                gravdt + invmdt * ( particle.force[i]
-                        + EH::Matrix::Cross( particle.vorticity[i] , particle.angularpressure[i] )
-                        );
+                gravdt + invmdt *
+                ( particle.force[i] );
         }
-        transform( particle.velocity , particle.velocity + particle.count , particle.force , particle.velocity ,
-                []( const vector2& vel , const vector2& force )->vector2
-                {
-                    return vel + force;
-                }
-                );
-        for( decltype( particle.count ) i=0; i<particle.count; ++i )
+        for( unsigned int i=0; i<particle.count; ++i )
+        {
+            particle.velocity[i] += particle.force[i];
+        }
+        for( unsigned int i=0; i<particle.count; ++i )
         {
             particle.position[i] += dt * ( particle.velocity[i] + 0.5f*particle.force[i] );
         }
-        fill( particle.force , particle.force + particle.count , vector2(0.0f) );
+        std::fill( particle.force.get() , particle.force.get() + particle.count , vector2(0.0f) );
 
         ClampVelocity();
     }
@@ -265,21 +201,16 @@ struct FluidBody : public FluidGroup
 
     void LoadBody( float invIfactor=1.0f )
     {
-using std::transform;
-using std::accumulate;
         invN = 1.0f/(float)particle.count;
 
-        const vector2 centerpos = accumulate( particle.position , particle.position + particle.count ,
-                vector2( 0.0f ) ) * invN;
+        const vector2 centerpos = std::accumulate( particle.position.get() , particle.position.get() + particle.count , vector2( 0.0f ) ) * invN;
 
         position = centerpos;
-        transform( particle.position , particle.position + particle.count , particle.relative ,
-                [&centerpos]( const vector2& partpos )->vector2
-                {
-                    return partpos - centerpos;
-                }
-                );
-        const float inertia = accumulate( particle.relative , particle.relative + particle.count , 0.0f ,
+        for( unsigned int i=0; i<particle.count; ++i )
+        {
+            particle.relative[i] = particle.position[i] - centerpos;
+        }
+        const float inertia = std::accumulate( particle.relative.get() , particle.relative.get() + particle.count , 0.0f ,
                 []( const float cur , const vector2& rel )->float
                 {
                     return cur + rel.LengthSquared();
@@ -290,15 +221,13 @@ using std::accumulate;
 
     void Advect( float dt ) override
     {
-using std::accumulate;
-using std::inner_product;
-using std::transform;
-using std::for_each;
-        const vector2 adt = ( accumulate( particle.force , particle.force + particle.count , vector2(0.0f) )*mass.invm*invN + gravity*mass.ascale ) * dt;
+        const vector2 adt =
+            ( std::accumulate( particle.force.get() , particle.force.get() + particle.count , vector2(0.0f) )*mass.invm*invN + gravity*mass.ascale )
+            * dt;
         velocity += adt;
         position += ( velocity + 0.5f*adt ) * dt;
 
-        const float alphadt = inner_product( particle.force , particle.force + particle.count , particle.relative , 0.0f ,
+        const float alphadt = std::inner_product( particle.force.get() , particle.force.get() + particle.count , particle.relative.get() , 0.0f ,
                 std::plus<float>() ,
                 []( const vector2& force , const vector2& rel )->float
                 {
@@ -311,32 +240,15 @@ using std::for_each;
         const float dtheta = ( omega + 0.5f*alphadt ) * dt;
         const vector2 dthetap = EH::Matrix::Complex::Complex( dtheta );
 
-
-        for_each( particle.relative , particle.relative ,
-                [&dthetap]( vector2& rel )
-                {
-                    rel = EH::Matrix::Complex::Multiply( rel , dthetap );
-                    //rel.rotate( dthetap.x , dthetap.y );
-                }
-                );
-
-        const vector2 pos = position;
-        transform( particle.relative , particle.relative + particle.count , particle.position ,
-                [&pos]( const vector2& rel )->vector2
-                {
-                    return pos + rel;
-                }
-                );
-        const vector2 vel = velocity;
-        const float omg = omega;
-        transform( particle.relative , particle.relative + particle.count , particle.velocity ,
-                [&vel , omg]( const vector2& rel )->vector2
-                {
-                    return EH::Matrix::Cross( omg , rel );
-                }
-                );
+        for( unsigned int i=0; i<particle.count; ++i )
+        {
+            particle.relative[i] = EH::Matrix::Complex::Multiply( dthetap , particle.relative[i] );
+            particle.position[i] = position + particle.relative[i];
+            particle.velocity[i] = EH::Matrix::Cross( omega , particle.relative[i] );
+        }
     }
 };
+
 
 struct FluidRope : public FluidGroup
 {
@@ -367,30 +279,25 @@ constexpr static unsigned int ITERATION = 5;
     }
     void Iterate()
     {
-        const float rl = rope_length;
-        std::for_each( ropepair.cbegin() , ropepair.cend() ,
-                [rl]( const RopePair& pair )
-                {
-                    vector2 rel = *pair.pos2 - *pair.pos1;
-                    const float gap = rel.Normalize() - rl;
-                    rel *= gap * FIX_FACTOR * 0.5f;
-                    *pair.pos1 += rel;
-                    *pair.pos2 -= rel;
-                }
-                );
+        for( RopePair& pair : ropepair )
+        {
+            vector2 rel = *pair.pos2 - *pair.pos1;
+            const float gap = rel.Normalize() - rope_length;
+            rel *= gap * FIX_FACTOR * 0.5f;
+            *pair.pos1 += rel;
+            *pair.pos2 -= rel;
+        }
     }
     void Advect( float dt ) override
     {
-using std::copy;
-using std::transform;
         FluidGroup::Advect( dt );
-        copy( particle.position , particle.position + particle.count , particle.relative );
+        std::copy( particle.position.get() , particle.position.get() + particle.count , particle.relative.get() );
         for( unsigned int i=0; i<ITERATION; ++i )
         {
             Iterate();
         }
         const float invdtfactor = VELOCITY_FACTOR/dt;
-        for( decltype( particle.count ) i=0; i<particle.count; ++i )
+        for( unsigned int i=0; i<particle.count; ++i )
         {
             particle.velocity[i] += ( particle.position[i] - particle.relative[i] ) * ( invdtfactor ) ;
         }

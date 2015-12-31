@@ -6,19 +6,10 @@
 #include <tuple>
 #include <algorithm>
 #include <cmath>
-//#include <valarray>
-#include "../Matrix/EHMatrix.h"
-//#include "vector2.h"
+#include <memory>
 
-#ifndef VECTOR2_TYPE
-#define VECTOR2_TYPE
+#include "fluid_global.h"
 
-typedef EH::Matrix::Matrix< float , 2 , 1 > vector2;
-template < typename T >
-using vec2 = EH::Matrix::Matrix< T , 2 , 1 >;
-//#include "vector2.h"
-
-#endif
 
 struct FluidGroup;
 
@@ -55,8 +46,6 @@ public:
         vector2 *force1 , *force2;
         float *press1 , *press2;
         float *veldif1 , *veldif2;
-        float *omega1 , *omega2;
-        vector2 *vortice1 , *vortice2;
 
         ParticlePair(){}
     };
@@ -65,33 +54,18 @@ public:
     {
         unsigned int w , h;
         unsigned int count;
-        particle_index_type *grid;
-        unsigned int *gridcount;
-        unsigned int *gridoffset;
+        std::unique_ptr< particle_index_type[] > grid;
+        std::unique_ptr< unsigned int[] > gridcount , gridoffset;
 
-        GridContainer()
-        {
-            std::cout << "Grid Construct" << "\n";
-            grid = 0;
-            gridcount = 0;
-            gridoffset = 0;
-        }
-        ~GridContainer()
-        {
-            std::cout << "Grid Destruct" << "\n";
-            if( grid ){ delete[] grid; }
-            if( gridcount ){ delete[] gridcount; }
-            if( gridoffset ){ delete[] gridoffset; }
-        }
         void Load( unsigned int _w , unsigned int _h , unsigned int maxc )
         {
             std::cout << "Grid Load" << "\n";
             w = _w;
             h = _h;
             count = _w * _h;
-            grid = new particle_index_type[ maxc ];
-            gridcount = new unsigned int[ count ];
-            gridoffset = new unsigned int[ count + 1 ];
+            grid = std::template make_unique< particle_index_type[] >( maxc );
+            gridcount = std::template make_unique< unsigned int[] >( count+1 );
+            gridoffset = std::template make_unique< unsigned int[] >( count + 1 );
             gridoffset[0] = 0;
         }
     } grid_attrib;
@@ -103,7 +77,6 @@ public:
     {
         vector2 min;
         vector2 max;
-        vector2 mingrid;
     } aabb;
 
     //int gridsize_bitfactor;

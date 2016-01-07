@@ -23,15 +23,15 @@ struct FluidGroup
         unsigned int count;
         unsigned int max;
         std::unique_ptr< vector2[] > position ,
-                                   velocity ,
-                                   force ,
-                                   relative ,
-                                   surfacenormal;
+                                     velocity ,
+                                     force ,
+                                     relative ,
+                                     surfacenormal;
         std::unique_ptr< float[] >   rho ,
-                                   pressure ,
-                                   veldiffpressure;
+                                     pressure ,
+                                     veldiffpressure;
         std::unique_ptr< unsigned int[] > grid ,
-                                        gridindex;
+                                          gridindex;
         void Init()
         {
             std::fill( rho.get() , rho.get() + count , 0.0f );
@@ -60,6 +60,7 @@ struct FluidGroup
         {
             --count;
             if( pos == count ){ return; }
+
             position[ pos ] = position[ count ];
             velocity[ pos ] = velocity[ count ];
             grid[ pos ] = grid[ count ];
@@ -163,8 +164,8 @@ constexpr static float MAX_VELOCITY_MAG = 10.0f;
     }
     virtual void Advect( float dt )
     {
-        const vector2 gravdt = gravity * (mass.ascale*dt);
-        const float invmdt = mass.invm*dt;
+        const vector2 gravdt = gravity * mass.ascale * dt;
+        const float invmdt = mass.invm * dt;
         for( unsigned int i=0; i<particle.count; ++i )
         {
             particle.force[i] =

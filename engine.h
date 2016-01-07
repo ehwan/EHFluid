@@ -44,10 +44,8 @@ public:
         float length;
         float q,q2;
         vector2 *force1 , *force2;
-        float *press1 , *press2;
-        float *veldif1 , *veldif2;
-
-        ParticlePair(){}
+        const float *press1 , *press2;
+        const float *veldif1 , *veldif2;
     };
 
     struct GridContainer

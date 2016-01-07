@@ -2,6 +2,7 @@
 #include "fluidgroup.h"
 
 #include <iostream>
+#include "../EHLog.h"
 
 
 FluidEngine::FluidEngine()
@@ -18,7 +19,7 @@ void FluidEngine::Load( const vector2& minbound , const vector2& maxbound , unsi
 
     aabb.min = minbound - METER_PER_GRID*1.1f;
     aabb.max = maxbound + METER_PER_GRID*1.1f;
-
+    ((aabb.max - aabb.min)*GRID_PER_METER ).Log();
     const vec2< unsigned int > gsize = EH::Matrix::ceil( (aabb.max - aabb.min)*GRID_PER_METER ).Convert< unsigned int >();
     grid_attrib.Load( gsize.x , gsize.y , maxc );
 }
@@ -148,9 +149,11 @@ void FluidEngine::AddPair( const particle_index_type& p1 , const particle_index_
     const float lsq = rel.LengthSquared();
     if( lsq < H2 )
     {
-        const float h = 1.0f - lsq*INV_H2;
+        const float h  = 1 - lsq*INV_H2;
         const float m1 = p1.group->mass.m;
         const float m2 = p2.group->mass.m;
+        const float l  = rel.Normalize();
+        const float q  = 1 - l*INV_H;
 
         p1.group->particle.rho[p1.index] += m2*h;
         p2.group->particle.rho[p2.index] += m1*h;
@@ -158,37 +161,33 @@ void FluidEngine::AddPair( const particle_index_type& p1 , const particle_index_
         if( same_group && p1.group->collideconnected==false ){ return; }
         if( p1.group->type==FluidGroup::STATIC && p2.group->type==FluidGroup::STATIC ){ return; }
 
-        //pairlist.resize( pairlist.size() + 1 );
-        pairlist.emplace_back();
-        ParticlePair& pair = pairlist.back();
-        pair.length = rel.Normalize();
-        pair.q = 1.0f - pair.length*INV_H;
-        pair.q2 = pair.q * pair.q;
-        pair.relq = rel * pair.q2;
-        pair.force1 = p1.group->particle.force.get() + p1.index;
-        pair.force2 = p2.group->particle.force.get() + p2.index;
-        pair.press1 = p1.group->particle.pressure.get() + p1.index;
-        pair.press2 = p2.group->particle.pressure.get() + p2.index;
-        pair.veldif1 = p1.group->particle.veldiffpressure.get() + p1.index;
-        pair.veldif2 = p2.group->particle.veldiffpressure.get() + p2.index;
+        pairlist.push_back
+        ({
+            rel*q ,
+            l ,
+            q , q*q ,
+            p1.group->particle.force.get() + p1.index , p2.group->particle.force.get() + p2.index ,
+            p1.group->particle.pressure.get() + p1.index , p2.group->particle.pressure.get() + p2.index ,
+            p1.group->particle.veldiffpressure.get() + p1.index , p2.group->particle.veldiffpressure.get() + p2.index
+        });
+        const auto dv = ( p2.group->particle.velocity[p2.index] - p1.group->particle.velocity[p1.index] );
+        {
+            const vector2 dvf = dv * ( q*q * p1.group->viscosity * p2.group->viscosity );
+            p1.group->particle.force[ p1.index ] += dvf;
+            p2.group->particle.force[ p2.index ] -= dvf;
+        }
 
-        const vector2 dv = ( p2.group->particle.velocity[p2.index] - p1.group->particle.velocity[p1.index] );
-        const vector2 dvf = dv * pair.q2 * p1.group->viscosity * p2.group->viscosity;
-        *pair.force1 += dvf;
-        *pair.force2 -= dvf;
+        p1.group->particle.surfacenormal[ p1.index ] -= rel*q;
+        p2.group->particle.surfacenormal[ p2.index ] += rel*q;
 
-        p1.group->particle.surfacenormal[ p1.index ] -= pair.relq;
-        p2.group->particle.surfacenormal[ p2.index ] += pair.relq;
-
-        //const float dvr = -dv.dot( rel ) * h;
         const float dvr = -h * ( dv.Transpose()*rel );
-        *pair.veldif1 += dvr*m2;
-        *pair.veldif2 += dvr*m1;
+        p1.group->particle.veldiffpressure[ p1.index ] += dvr * m2;
+        p2.group->particle.veldiffpressure[ p2.index ] += dvr * m1;
     }
 }
 void FluidEngine::Force()
 {
-    for( ParticlePair& pair : pairlist )
+    for( ParticlePair pair : pairlist )
     {
         const vector2 f =
             (

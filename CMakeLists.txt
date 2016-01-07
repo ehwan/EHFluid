@@ -10,8 +10,10 @@ set( CMAKE_BUILD_TYPE Debug )
 
 #set( BUILD_SHARED_LIBS ON )
 
+add_definitions( -DNO_LOAD_LODEPNG )
+#add_definitions( -DGLEW_STATIC )
 
-set( DEFAULT_FLAGS "-std=c++14 -Wall -lglfw -lGLEW -lGL" )
+set( DEFAULT_FLAGS "-std=c++14 -Wall" )
 
 set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DEFAULT_FLAGS}" )
 set( CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${DEFAULT_FLAGS} -Werror -O0" )
@@ -31,3 +33,5 @@ list( APPEND SOURCES
     )
 
 add_executable( EHApplication ${SOURCES} main.cpp engine.cpp )
+
+target_link_libraries( EHApplication glfw GLEW GL )
